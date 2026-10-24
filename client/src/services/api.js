@@ -1,61 +1,15 @@
-import axios from 'axios';
+import http from './http';
 
-const API_URL = 'http://localhost:5000/api';
+/** Fábrica de servicios CRUD: canciones y playlists comparten el mismo contrato REST. */
+function createResourceService(path) {
+  return {
+    getAll: async () => (await http.get(path)).data,
+    getById: async (id) => (await http.get(`${path}/${id}`)).data,
+    create: async (data) => (await http.post(path, data)).data,
+    update: async (id, data) => (await http.put(`${path}/${id}`, data)).data,
+    delete: async (id) => (await http.delete(`${path}/${id}`)).data,
+  };
+}
 
-const api = axios.create({
-    baseURL: API_URL,
-    headers: {
-        'Content-Type': 'application/json',
-    },
-});
-
-// Interceptor para manejar errores
-api.interceptors.response.use(
-    response => response,
-    error => {
-        if (error.response) {
-            // El servidor respondió con un código de error
-            return Promise.reject({
-                message: error.response.data.message || 'Error del servidor',
-                errors: error.response.data.errors || [],
-                status: error.response.status
-            });
-        } else if (error.request) {
-            // La petición fue hecha pero no hubo respuesta
-            return Promise.reject({
-                message: 'No se pudo conectar con el servidor',
-                errors: [],
-                status: 0
-            });
-        } else {
-            // Algo pasó al configurar la petición
-            return Promise.reject({
-                message: error.message,
-                errors: [],
-                status: 0
-            });
-        }
-    }
-);
-
-// Servicios para canciones
-export const songService = {
-    getAll: () => api.get('/songs'),
-    getById: (id) => api.get(`/songs/${id}`),
-    create: (songData) => api.post('/songs', songData),
-    update: (id, songData) => api.put(`/songs/${id}`, songData),
-    delete: (id) => api.delete(`/songs/${id}`)
-};
-
-// Servicios para playlists
-export const playlistService = {
-    getAll: () => api.get('/playlists'),
-    getById: (id) => api.get(`/playlists/${id}`),
-    create: (playlistData) => api.post('/playlists', playlistData),
-    update: (id, playlistData) => api.put(`/playlists/${id}`, playlistData),
-    delete: (id) => api.delete(`/playlists/${id}`),
-    addSong: (playlistId, songId) => api.post(`/playlists/${playlistId}/songs`, { songId }),
-    removeSong: (playlistId, songId) => api.delete(`/playlists/${playlistId}/songs/${songId}`)
-};
-
-export default api;
+export const songService = createResourceService('/songs');
+export const playlistService = createResourceService('/playlists');

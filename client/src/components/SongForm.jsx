@@ -1,208 +1,97 @@
-import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useCallback } from 'react';
+import FormField from './ui/FormField';
+import FormActions from './ui/FormActions';
+import { useAsyncData } from '../hooks/useAsyncData';
+import { useResourceForm } from '../hooks/useResourceForm';
 import { songService } from '../services/api';
+import { compose, maxLength, minLength, required } from '../lib/validation';
 
-const SongForm = ({ isEdit = false }) => {
-    const navigate = useNavigate();
-    const { id } = useParams();
-    
-    const [formData, setFormData] = useState({
-        title: '',
-        artist: '',
-        genre: '',
-        album: ''
-    });
-    
-    const [errors, setErrors] = useState({});
-    const [loading, setLoading] = useState(false);
-    const [formError, setFormError] = useState('');
-
-    useEffect(() => {
-        if (isEdit && id) {
-            fetchSong();
-        }
-    }, [isEdit, id]);
-
-    const fetchSong = async () => {
-        try {
-            setLoading(true);
-            const response = await songService.getById(id);
-            setFormData(response.data);
-            setFormError('');
-        } catch (err) {
-            setFormError('Error al cargar la canción');
-            console.error(err);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({
-            ...prev,
-            [name]: value
-        }));
-        // Limpiar error específico cuando el usuario empieza a escribir
-        if (errors[name]) {
-            setErrors(prev => ({
-                ...prev,
-                [name]: ''
-            }));
-        }
-    };
-
-    const validateForm = () => {
-        const newErrors = {};
-        
-        if (!formData.title.trim()) {
-            newErrors.title = 'El título es requerido';
-        } else if (formData.title.trim().length < 2) {
-            newErrors.title = 'El título debe tener al menos 2 caracteres';
-        }
-        
-        if (!formData.artist.trim()) {
-            newErrors.artist = 'El artista es requerido';
-        } else if (formData.artist.trim().length < 2) {
-            newErrors.artist = 'El artista debe tener al menos 2 caracteres';
-        }
-        
-        if (!formData.genre.trim()) {
-            newErrors.genre = 'El género es requerido';
-        } else if (formData.genre.trim().length < 2) {
-            newErrors.genre = 'El género debe tener al menos 2 caracteres';
-        }
-        
-        if (formData.album && formData.album.trim().length > 100) {
-            newErrors.album = 'El álbum no puede exceder 100 caracteres';
-        }
-
-        return newErrors;
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        
-        const validationErrors = validateForm();
-        if (Object.keys(validationErrors).length > 0) {
-            setErrors(validationErrors);
-            return;
-        }
-
-        setLoading(true);
-        setFormError('');
-
-        try {
-            if (isEdit) {
-                await songService.update(id, formData);
-            } else {
-                await songService.create(formData);
-            }
-            navigate('/');
-        } catch (err) {
-            if (err.errors && Array.isArray(err.errors)) {
-                // Errores de validación del servidor
-                const serverErrors = {};
-                err.errors.forEach(errorMsg => {
-                    if (errorMsg.includes('título')) serverErrors.title = errorMsg;
-                    else if (errorMsg.includes('artista')) serverErrors.artist = errorMsg;
-                    else if (errorMsg.includes('género')) serverErrors.genre = errorMsg;
-                    else if (errorMsg.includes('álbum')) serverErrors.album = errorMsg;
-                });
-                setErrors(serverErrors);
-            } else {
-                setFormError(err.message || 'Error al guardar la canción');
-            }
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    if (loading && isEdit) return <div>Cargando...</div>;
-
-    return (
-        <div className="song-form">
-            <h2>{isEdit ? 'Editar Canción' : 'Nueva Canción'}</h2>
-            
-            {formError && <div className="alert alert-danger">{formError}</div>}
-            
-            <form onSubmit={handleSubmit}>
-                <div className="form-group">
-                    <label htmlFor="title">Título *</label>
-                    <input
-                        type="text"
-                        id="title"
-                        name="title"
-                        value={formData.title}
-                        onChange={handleChange}
-                        className={errors.title ? 'error' : ''}
-                        placeholder="Ej: November Rain"
-                    />
-                    {errors.title && <div className="error-message">{errors.title}</div>}
-                </div>
-
-                <div className="form-group">
-                    <label htmlFor="artist">Artista *</label>
-                    <input
-                        type="text"
-                        id="artist"
-                        name="artist"
-                        value={formData.artist}
-                        onChange={handleChange}
-                        className={errors.artist ? 'error' : ''}
-                        placeholder="Ej: Guns N' Roses"
-                    />
-                    {errors.artist && <div className="error-message">{errors.artist}</div>}
-                </div>
-
-                <div className="form-group">
-                    <label htmlFor="genre">Género *</label>
-                    <input
-                        type="text"
-                        id="genre"
-                        name="genre"
-                        value={formData.genre}
-                        onChange={handleChange}
-                        className={errors.genre ? 'error' : ''}
-                        placeholder="Ej: Rock, Power Ballads"
-                    />
-                    {errors.genre && <div className="error-message">{errors.genre}</div>}
-                </div>
-
-                <div className="form-group">
-                    <label htmlFor="album">Álbum</label>
-                    <input
-                        type="text"
-                        id="album"
-                        name="album"
-                        value={formData.album}
-                        onChange={handleChange}
-                        className={errors.album ? 'error' : ''}
-                        placeholder="Ej: Use Your Illusion I"
-                    />
-                    {errors.album && <div className="error-message">{errors.album}</div>}
-                </div>
-
-                <div className="form-actions">
-                    <button
-                        type="submit"
-                        className="btn btn-primary"
-                        disabled={loading}
-                    >
-                        {loading ? 'Guardando...' : (isEdit ? 'Actualizar' : 'Crear')}
-                    </button>
-                    <button
-                        type="button"
-                        className="btn btn-secondary"
-                        onClick={() => navigate('/')}
-                        disabled={loading}
-                    >
-                        Cancelar
-                    </button>
-                </div>
-            </form>
-        </div>
-    );
+const schema = {
+  title: compose(required('El título'), minLength('El título', 2), maxLength('El título', 100)),
+  artist: compose(required('El artista'), minLength('El artista', 2), maxLength('El artista', 100)),
+  genre: compose(required('El género'), minLength('El género', 2), maxLength('El género', 50)),
+  album: maxLength('El álbum', 100),
 };
+const EMPTY = { title: '', artist: '', genre: '', album: '' };
 
-export default SongForm;
+export default function SongForm({ isEdit = false }) {
+  const { id } = useParams();
+  const loader = useCallback(
+    () => (isEdit ? songService.getById(id) : Promise.resolve(EMPTY)),
+    [isEdit, id],
+  );
+  const { data, loading, error } = useAsyncData(loader, EMPTY);
+
+  if (loading) return <div className="loading">Cargando...</div>;
+  if (error)
+    return (
+      <div className="alert alert-danger" role="alert">
+        {error}
+      </div>
+    );
+  return <SongFormBody isEdit={isEdit} id={id} initial={{ ...EMPTY, ...data }} />;
+}
+
+function SongFormBody({ isEdit, id, initial }) {
+  const navigate = useNavigate();
+  const form = useResourceForm({
+    initialValues: initial,
+    schema,
+    onSubmit: async (values) => {
+      if (isEdit) await songService.update(id, values);
+      else await songService.create(values);
+      navigate('/');
+    },
+  });
+  const { values, errors, handleChange } = form;
+
+  return (
+    <div className="song-form">
+      <h2>{isEdit ? 'Editar Canción' : 'Nueva Canción'}</h2>
+      {form.formError && (
+        <div className="alert alert-danger" role="alert">
+          {form.formError}
+        </div>
+      )}
+      <form onSubmit={form.handleSubmit} noValidate>
+        <FormField
+          id="title"
+          label="Título"
+          required
+          value={values.title}
+          onChange={handleChange}
+          error={errors.title}
+          placeholder="Ej: November Rain"
+        />
+        <FormField
+          id="artist"
+          label="Artista"
+          required
+          value={values.artist}
+          onChange={handleChange}
+          error={errors.artist}
+          placeholder="Ej: Guns N' Roses"
+        />
+        <FormField
+          id="genre"
+          label="Género"
+          required
+          value={values.genre}
+          onChange={handleChange}
+          error={errors.genre}
+          placeholder="Ej: Rock"
+        />
+        <FormField
+          id="album"
+          label="Álbum"
+          value={values.album}
+          onChange={handleChange}
+          error={errors.album}
+          placeholder="Ej: Use Your Illusion I"
+        />
+        <FormActions submitting={form.submitting} isEdit={isEdit} />
+      </form>
+    </div>
+  );
+}
